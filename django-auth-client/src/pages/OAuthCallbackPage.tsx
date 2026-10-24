@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 
-const DJANGO_API_URL = "http://localhost:8000";
+const DJANGO_API_URL = import.meta.env.VITE_DJANGO_API_URL;
 
 type SessionResponse = {
   data?: {

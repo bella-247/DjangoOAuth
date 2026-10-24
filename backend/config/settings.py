@@ -1,22 +1,28 @@
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / ".env")
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!pes#7(xc$ef#3&%8@zp^q-rp*%9pndboexsnfa0sjz2#e4d1@'
+DEBUG = os.getenv("DJANGO_DEBUG", "False").strip() == "True"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip() 
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 # Cross Origin Resource Sharing
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 
@@ -143,14 +149,20 @@ SITE_ID = 1
 
 HEADLESS_ONLY = True
 
+FRONTEND_URL = os.environ["DJANGO_FRONTEND_URL"].rstrip("/")
+
 HEADLESS_FRONTEND_URLS = {
-    "account_confirm_email": "http://localhost:5173/account/confirm-email/{key}",
-    "account_reset_password": "http://localhost:5173/account/password/reset",
-    "account_reset_password_from_key": "http://localhost:5173/account/password/reset/key/{key}",
-    "account_signup": "http://localhost:5173/account/signup",
-    "socialaccount_login_error": "http://localhost:5173/account/social/login/error",
+    "account_confirm_email": (f"{FRONTEND_URL}/account/confirm-email/{{key}}"),
+    "account_reset_password": (f"{FRONTEND_URL}/account/password/reset"),
+    "account_reset_password_from_key": (
+        f"{FRONTEND_URL}/account/password/reset/key/{{key}}"
+    ),
+    "account_signup": f"{FRONTEND_URL}/account/signup",
+    "socialaccount_login_error": (f"{FRONTEND_URL}/account/social/login/error"),
 }
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
+    origin.strip().rstrip("/")
+    for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
