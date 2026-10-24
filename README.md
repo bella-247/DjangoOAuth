@@ -123,3 +123,8 @@ session verification work end to end.
 - [`docs/06-verify-headless-api.md`](docs/06-verify-headless-api.md)
 - [`docs/07-build-react-frontend.md`](docs/07-build-react-frontend.md)
 - [`docs/08-audit-oauth-frontend.md`](docs/08-audit-oauth-frontend.md)
+- [`docs/10-audit-backend.md`](docs/10-audit-backend.md)
+- [`docs/11-test-headless-authentication.md`](docs/11-test-headless-authentication.md)
+- [`docs/12-test-session-logout-and-csrf.md`](docs/12-test-session-logout-and-csrf.md)
+- [`docs/13-production-readiness-audit.md`](docs/13-production-readiness-audit.md)
+- [`docs/14-modularize-backend-configuration.md`](docs/14-modularize-backend-configuration.md)
