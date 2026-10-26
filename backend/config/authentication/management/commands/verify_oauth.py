@@ -5,8 +5,8 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
 
-from config.authentication.conf import build
-from config.authentication.site_helpers import get_site
+from ...conf import PROVIDER_CONFIGS, build
+from ...site_helpers import get_site
 
 
 class Command(BaseCommand):
@@ -74,8 +74,6 @@ class Command(BaseCommand):
 
     def _check_env_vars(self) -> bool:
         self.stdout.write("\n3. Environment Variables:")
-        from config.authentication.conf import PROVIDER_CONFIGS
-
         all_ok = True
         for provider_id, config in PROVIDER_CONFIGS.items():
             client_id = config["client_id_env"]

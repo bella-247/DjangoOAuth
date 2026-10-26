@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { GoogleMark } from "../components/GoogleMark";
+import { Button } from "../components/Button";
 import { signInWithGoogle } from "../auth/google";
 
 export default function SignInPage() {
@@ -43,14 +44,14 @@ export default function SignInPage() {
             Google.
           </p>
 
-          <button
+          <Button
             className="google-button"
             type="button"
             onClick={() => void handleGoogleSignIn()}
           >
             <GoogleMark />
             <span>Continue with Google</span>
-          </button>
+          </Button>
 
           {notice && (
             <p className="inline-notice" role="status">

@@ -5,7 +5,7 @@ from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
 from getpass import getpass
 
-from config.authentication.site_helpers import ensure_site
+from ...site_helpers import ensure_site
 
 
 class Command(BaseCommand):

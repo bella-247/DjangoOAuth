@@ -114,6 +114,10 @@
     transform 160ms ease;
 }
 
+.button {
+  font: inherit;
+}
+
 .google-button:hover {
   border-color: #aeb9cc;
   box-shadow: 0 5px 18px rgb(28 43 73 / 6%);
