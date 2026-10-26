@@ -16,6 +16,7 @@ from .urls import urlpatterns as auth_urlpatterns
 from .site_helpers import ensure_site, get_site
 
 
+@override_settings(DJANGO_AUTH_MODE="cross-domain")
 class HeadlessAuthenticationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -56,7 +57,6 @@ class HeadlessAuthenticationTests(TestCase):
         response = self.client.get("/_allauth/browser/v1/auth/session")
 
         self.assertEqual(response.status_code, 401)
-
         payload = response.json()
         self.assertEqual(payload["status"], 401)
         self.assertFalse(payload["meta"]["is_authenticated"])
@@ -64,6 +64,14 @@ class HeadlessAuthenticationTests(TestCase):
             {flow["id"] for flow in payload["data"]["flows"]},
             {"login", "signup", "provider_redirect", "provider_token"},
         )
+
+    def test_build_defaults_to_session_mode(self):
+        settings = build({})
+        self.assertEqual(settings["DJANGO_AUTH_MODE"], "session")
+
+    def test_build_rejects_invalid_auth_mode(self):
+        with self.assertRaises(ValueError):
+            build({"DJANGO_AUTH_MODE": "token"})
 
     def test_protected_current_user_endpoint_requires_authentication(self):
         response = self.client.get("/api/me")

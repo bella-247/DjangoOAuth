@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from .authentication.conf import (
     AUTHENTICATION_BACKENDS,
     DJANGO_ACCESS_TOKEN_LIFETIME_SECONDS,
+    DJANGO_AUTH_MODE,
     DJANGO_AUTH_FRONTEND_URL,
     CORS_ALLOW_CREDENTIALS,
     CORS_ALLOWED_ORIGINS,

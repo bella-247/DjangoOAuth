@@ -1,4 +1,6 @@
 const DJANGO_API_URL = import.meta.env.VITE_DJANGO_API_URL;
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL;
+const AUTH_MODE = import.meta.env.VITE_DJANGO_AUTH_MODE ?? "session";
 
 export async function signInWithGoogle(): Promise<void> {
   // 1. Ask Django for its headless configuration and receive
@@ -37,7 +39,10 @@ export async function signInWithGoogle(): Promise<void> {
   const fields: Record<string, string> = {
     provider: "google",
     process: "login",
-    callback_url: `${DJANGO_API_URL}/api/auth/callback`,
+    callback_url:
+      AUTH_MODE === "cross-domain"
+        ? `${DJANGO_API_URL}/api/auth/callback`
+        : `${FRONTEND_URL}/account/provider/callback`,
     csrfmiddlewaretoken: csrfToken,
   };
 

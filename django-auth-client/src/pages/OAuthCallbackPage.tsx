@@ -34,16 +34,14 @@ export default function OAuthCallbackPage() {
 
       try {
         const code = params.get("code");
-        if (!code) {
-          setAuth({ status: "unauthenticated" });
-          return;
+        if (code) {
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
+          );
+          await exchangeAuthorizationCode(code);
         }
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname,
-        );
-        await exchangeAuthorizationCode(code);
         const user = await getCurrentUser();
 
         if (!user) {
