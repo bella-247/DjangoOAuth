@@ -115,6 +115,17 @@ session verification work end to end.
   local callback URLs in production.
 - Before deployment, configure HTTPS, secure cookies, allowed hosts, trusted
   origins, production redirect URLs, and environment-managed secrets.
+- For production SPAs, use a shared parent domain such as
+  `app.example.com` and `api.example.com`. Set
+  `DJANGO_SESSION_COOKIE_DOMAIN=.example.com`, enable secure cookies, and
+  allow the frontend origin in both CORS and CSRF settings.
+- If the frontend and backend are unrelated domains, a cookie domain cannot
+  bridge them. Use a shared custom domain or reverse proxy; browser
+  third-party-cookie rules cannot be bypassed by Django configuration.
+- The feature branch `feature/cross-domain-token-auth` adds an alternative
+  database-backed authorization-code exchange and bearer-token flow for
+  unrelated frontend and backend hosts.
+  It is not part of the released package yet.
 
 ## Further reading
 

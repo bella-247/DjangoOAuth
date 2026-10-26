@@ -5,12 +5,15 @@ from django.test import Client
 from django.test import TestCase
 from django.test import override_settings
 
-from allauth.socialaccount.models import SocialApp
+from allauth.socialaccount.models import SocialAccount, SocialApp
 
-from config.authentication.conf import build
-from config.authentication.utils import load_env_file
-from config.authentication.urls import urlpatterns as auth_urlpatterns
-from config.authentication.site_helpers import ensure_site, get_site
+from .models import AccessToken
+from .models import OAuthHandoffCode
+
+from .conf import build
+from .utils import load_env_file
+from .urls import urlpatterns as auth_urlpatterns
+from .site_helpers import ensure_site, get_site
 
 
 class HeadlessAuthenticationTests(TestCase):
@@ -21,6 +24,13 @@ class HeadlessAuthenticationTests(TestCase):
         site.domain = "testserver"
         site.name = "testserver"
         site.save()
+        app = SocialApp.objects.create(
+            provider="google",
+            name="Google Test OAuth",
+            client_id="test.apps.googleusercontent.com",
+            secret="test-secret",
+        )
+        app.sites.add(site)
 
     def test_headless_config_lists_google_provider(self):
         response = self.client.get(
@@ -81,6 +91,75 @@ class HeadlessAuthenticationTests(TestCase):
         profile_payload = profile_response.json()
         self.assertEqual(profile_payload["status"], 200)
         self.assertEqual(profile_payload["data"]["user"]["username"], "test-user")
+        self.assertEqual(
+            profile_payload["data"]["user"]["email"],
+            "test@example.com",
+        )
+
+    def test_current_user_accepts_database_backed_bearer_token(self):
+        user = get_user_model().objects.create_user(
+            username="token-user",
+            email="token@example.com",
+            password="password",
+        )
+        _, raw_token = AccessToken.issue(user, timedelta(hours=1))
+        response = self.client.get(
+            "/api/me",
+            HTTP_AUTHORIZATION=f"Bearer {raw_token}",
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_authorization_code_exchange_is_single_use(self):
+        user = get_user_model().objects.create_user(
+            username="exchange-user",
+            password="password",
+        )
+        _, raw_code = OAuthHandoffCode.issue(user, timedelta(minutes=5))
+
+        response = self.client.post(
+            "/api/auth/exchange",
+            data={"code": raw_code},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access_token", response.json()["data"])
+
+        second_response = self.client.post(
+            "/api/auth/exchange",
+            data={"code": raw_code},
+            content_type="application/json",
+        )
+        self.assertEqual(second_response.status_code, 400)
+
+    def test_expired_bearer_token_is_rejected(self):
+        user = get_user_model().objects.create_user(username="expired-user")
+        _, raw_token = AccessToken.issue(user, timedelta(seconds=-1))
+        response = self.client.get(
+            "/api/me",
+            HTTP_AUTHORIZATION=f"Bearer {raw_token}",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_current_user_uses_provider_email_when_local_email_is_empty(self):
+        user = get_user_model().objects.create_user(
+            username="provider-user",
+            email="",
+        )
+        SocialAccount.objects.create(
+            user=user,
+            provider="google",
+            uid="provider-user-id",
+            extra_data={"email": "provider@example.com", "email_verified": True},
+        )
+        self.client.force_login(user)
+
+        response = self.client.get("/api/me")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["data"]["user"]["email"],
+            "provider@example.com",
+        )
 
     def test_logout_clears_authenticated_session(self):
         user = get_user_model().objects.create_user(
@@ -115,7 +194,11 @@ class HeadlessAuthenticationTests(TestCase):
         settings = build({
             "DJANGO_FRONTEND_URL": "http://localhost:5173",
         })
-        self.assertEqual(settings["SOCIALACCOUNT_PROVIDERS"], {})
+        self.assertEqual(
+            settings["SOCIALACCOUNT_PROVIDERS"]["google"]["SCOPE"],
+            ["profile", "email"],
+        )
+        self.assertNotIn("APP", settings["SOCIALACCOUNT_PROVIDERS"]["google"])
 
     def test_build_with_google_credentials(self):
         settings = build({
@@ -124,10 +207,22 @@ class HeadlessAuthenticationTests(TestCase):
             "DJANGO_GOOGLE_CLIENT_SECRET": "secret",
         })
         self.assertIn("google", settings["SOCIALACCOUNT_PROVIDERS"])
-        self.assertEqual(
-            settings["SOCIALACCOUNT_PROVIDERS"]["google"]["APP"]["client_id"],
-            "test.apps.googleusercontent.com",
+        self.assertNotIn("APP", settings["SOCIALACCOUNT_PROVIDERS"]["google"])
+
+    def test_build_supports_same_site_cookie_configuration(self):
+        settings = build(
+            {
+                "DJANGO_SESSION_COOKIE_DOMAIN": ".example.com",
+                "DJANGO_SESSION_COOKIE_SAMESITE": "Lax",
+                "DJANGO_CSRF_COOKIE_SAMESITE": "Lax",
+            }
         )
+        self.assertEqual(settings["SESSION_COOKIE_DOMAIN"], ".example.com")
+        self.assertEqual(settings["SESSION_COOKIE_SAMESITE"], "Lax")
+
+    def test_build_rejects_invalid_samesite_value(self):
+        with self.assertRaises(ValueError):
+            build({"DJANGO_SESSION_COOKIE_SAMESITE": "invalid"})
 
     def test_build_multiple_providers(self):
         settings = build({
@@ -140,14 +235,8 @@ class HeadlessAuthenticationTests(TestCase):
         })
         self.assertIn("google", settings["SOCIALACCOUNT_PROVIDERS"])
         self.assertIn("github", settings["SOCIALACCOUNT_PROVIDERS"])
-        self.assertEqual(
-            settings["SOCIALACCOUNT_PROVIDERS"]["google"]["APP"]["client_id"],
-            "google-id",
-        )
-        self.assertEqual(
-            settings["SOCIALACCOUNT_PROVIDERS"]["github"]["APP"]["client_id"],
-            "github-id",
-        )
+        self.assertNotIn("APP", settings["SOCIALACCOUNT_PROVIDERS"]["google"])
+        self.assertNotIn("APP", settings["SOCIALACCOUNT_PROVIDERS"]["github"])
 
     def test_frontend_url_normalization(self):
         settings1 = build({"DJANGO_FRONTEND_URL": "http://localhost:5173"})
@@ -189,3 +278,4 @@ class HeadlessAuthenticationTests(TestCase):
         self.assertEqual(updated.pk, 1)
         self.assertEqual(updated.domain, "new.com")
         self.assertEqual(updated.name, "New")
+from datetime import timedelta

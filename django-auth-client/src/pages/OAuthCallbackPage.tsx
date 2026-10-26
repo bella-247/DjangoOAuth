@@ -1,18 +1,11 @@
 
 import { useEffect, useState } from "react";
 
-const DJANGO_API_URL = import.meta.env.VITE_DJANGO_API_URL;
-
-type CurrentUserResponse = {
-  status: number;
-  data?: {
-    user?: {
-      id: number;
-      username: string;
-      email: string;
-    };
-  };
-};
+import {
+  exchangeAuthorizationCode,
+  getCurrentUser,
+} from "../auth/client";
+import { useAuth } from "../auth/useAuth";
 
 type AuthState =
   | { status: "loading" }
@@ -27,38 +20,33 @@ type AuthState =
 
 export default function OAuthCallbackPage() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
+  const { refresh } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
 
     async function verifySession() {
-      const params = new URLSearchParams(window.location.search);
+      const params = new URLSearchParams(window.location.hash.slice(1));
       if (params.has("error")) {
         setAuth({ status: "unauthenticated" });
         return;
       }
 
       try {
-        const response = await fetch(
-          `${DJANGO_API_URL}/api/me`,
-          { credentials: "include" },
-        );
-
-        if (response.status === 401) {
-          if (!cancelled) {
-            setAuth({ status: "unauthenticated" });
-          }
+        const code = params.get("code");
+        if (!code) {
+          setAuth({ status: "unauthenticated" });
           return;
         }
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
+        await exchangeAuthorizationCode(code);
+        const user = await getCurrentUser();
 
-        if (!response.ok) {
-          throw new Error(`Django returned HTTP ${response.status}`);
-        }
-
-        const result: CurrentUserResponse = await response.json();
-        const user = result.data?.user;
-
-        if (result.status !== 200 || !user) {
+        if (!user) {
           if (!cancelled) {
             setAuth({ status: "unauthenticated" });
           }
@@ -66,6 +54,7 @@ export default function OAuthCallbackPage() {
         }
 
         if (!cancelled) {
+          await refresh();
           setAuth({
             status: "authenticated",
             id: user.id,
@@ -89,7 +78,7 @@ export default function OAuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh]);
 
   return (
     <main

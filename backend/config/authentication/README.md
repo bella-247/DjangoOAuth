@@ -1,6 +1,13 @@
 # Django Authentication Module
 
-A reusable, drop-in authentication module for Django projects using django-allauth headless mode with Google OAuth (and other providers).
+A reusable authentication module for Django projects using django-allauth
+headless mode with Google OAuth. The first release is designed for a Django
+project with a React/Vite frontend, Django on port 8000, the frontend on port
+5173, and SQLite for local development.
+
+This is the **Approach A** version: copy the module into an existing Django
+project and add the small amount of settings and URL wiring below. A separate
+installable `django-auth-kit` package is planned for Approach B.
 
 ## Quick Start
 
@@ -26,9 +33,20 @@ your-project/
 │       └── management/
 ```
 
-### 2. Update `settings.py`
+### 2. Install dependencies
 
-Import and use the authentication settings:
+The consuming project must already have these packages:
+
+```bash
+uv add django "django-allauth[headless,socialaccount]" django-cors-headers python-dotenv
+```
+
+The module supports django-allauth's `headless` and `socialaccount` features.
+
+### 3. Register the module in `settings.py`
+
+The copied folder must be registered in `INSTALLED_APPS`. Import the finished
+settings exported by `conf.py`:
 
 ```python
 # your-project/config/settings.py
@@ -41,6 +59,7 @@ from .authentication.conf import (
     INSTALLED_APPS,
     MIDDLEWARE,
     AUTHENTICATION_BACKENDS,
+    SOCIALACCOUNT_ADAPTER,
     SITE_ID,
     HEADLESS_ONLY,
     HEADLESS_FRONTEND_URLS,
@@ -60,6 +79,9 @@ from .authentication.conf import (
     SECURE_HSTS_PRELOAD,
     SOCIALACCOUNT_PROVIDERS,
 )
+
+# `conf.py` already includes the copied authentication package in this list.
+# Do not add it a second time.
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -100,7 +122,19 @@ MAILERS = {
 }
 ```
 
-### 3. Update `urls.py`
+`AuthenticationConfig` in `apps.py` is the AppConfig for the module. The
+exported `INSTALLED_APPS` list already registers the copied authentication
+package. Keep that imported list in your settings; this is what lets Django
+discover the AppConfig and the `setup_oauth` and `verify_oauth` management
+commands. If you build `INSTALLED_APPS` manually instead of importing the
+list, add your copied package path yourself.
+
+The examples below assume the module is copied to
+`config/authentication/`. The module derives its own package path internally,
+so it can also be copied to another Python package without editing its
+internal imports.
+
+### 4. Update `urls.py`
 
 ```python
 # your-project/config/urls.py
@@ -115,7 +149,7 @@ urlpatterns = [
 ]
 ```
 
-### 4. Configure Environment Variables
+### 5. Configure Environment Variables
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -133,8 +167,9 @@ Required variables:
 - `DJANGO_FRONTEND_URL` - Your frontend origin (e.g., `http://localhost:5173`)
 - `DJANGO_CORS_ALLOWED_ORIGINS` - Same as frontend URL
 - `DJANGO_CSRF_TRUSTED_ORIGINS` - Same as frontend URL
-- `DJANGO_GOOGLE_CLIENT_ID` - Google OAuth client ID
-- `DJANGO_GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `DJANGO_ACCESS_TOKEN_LIFETIME_SECONDS` - Lifetime of cross-domain bearer tokens
+- `DJANGO_GOOGLE_CLIENT_ID` - Google OAuth client ID used by `setup_oauth`
+- `DJANGO_GOOGLE_CLIENT_SECRET` - Google OAuth client secret used by `setup_oauth`
 
 Optional (for additional providers):
 - `DJANGO_AUTH_PROVIDERS=google,github` - Comma-separated list
@@ -142,7 +177,7 @@ Optional (for additional providers):
 - `DJANGO_GITLAB_CLIENT_ID` / `DJANGO_GITLAB_CLIENT_SECRET`
 - `DJANGO_MICROSOFT_CLIENT_ID` / `DJANGO_MICROSOFT_CLIENT_SECRET`
 
-### 5. Run Migrations and Setup OAuth
+### 6. Run Migrations and Setup OAuth
 
 ```bash
 python manage.py migrate
@@ -150,32 +185,54 @@ python manage.py setup_oauth  # Interactive, or use --client-id/--client-secret
 python manage.py verify_oauth  # Verify everything is configured
 ```
 
-### 6. Start Development Server
+OAuth credentials are stored in the database-backed `SocialApp` record. The
+environment variables provide credentials to `setup_oauth`; they are not also
+registered as a settings-backed provider application. Keeping one source of
+provider credentials prevents django-allauth from finding multiple Google
+applications for the same Site.
+
+### 7. Start Development Server
 
 ```bash
 python manage.py runserver localhost:8000
 ```
 
-## Management Commands
+## Management commands
+
+The commands are available only after the authentication module has been added
+to `INSTALLED_APPS` and migrations have been applied.
 
 ### `setup_oauth`
 
-Interactively configure an OAuth provider:
+Creates or updates the database-backed `SocialApp`, associates it with the
+configured Site, and optionally writes the provider credentials to an env file.
+It is safe to run again for the same provider.
 
 ```bash
-# Interactive
+# Interactive: prompts for the client ID and secret
 python manage.py setup_oauth
 
-# Non-interactive (CI/CD)
+# Non-interactive
 python manage.py setup_oauth --provider google --client-id $ID --client-secret $SECRET --domain localhost:8000
 
-# Custom .env file
+# Write the credentials to a specific env file
 python manage.py setup_oauth --env-file /path/to/.env
 ```
 
+Options:
+
+- `--provider`: `google`, `github`, `gitlab`, or `microsoft` (default:
+  `google`)
+- `--client-id`: skips the client ID prompt
+- `--client-secret`: skips the client secret prompt
+- `--domain`: Site domain (default: `localhost:8000`)
+- `--name`: Site display name
+- `--env-file`: env file to update; it is not required
+
 ### `verify_oauth`
 
-Verify the complete OAuth configuration:
+Checks the Site, database-backed `SocialApp` records, provider environment
+variables, and the allauth headless configuration endpoint:
 
 ```bash
 python manage.py verify_oauth
@@ -187,6 +244,9 @@ Checks:
 3. Environment variables are set
 4. Allauth headless config endpoint is accessible
 
+Run it after `setup_oauth` and whenever you change provider or environment
+configuration.
+
 ## Supported Providers
 
 | Provider | Env Vars | Allauth App |
@@ -196,7 +256,10 @@ Checks:
 | GitLab | `DJANGO_GITLAB_CLIENT_ID`, `DJANGO_GITLAB_CLIENT_SECRET` | `allauth.socialaccount.providers.gitlab` |
 | Microsoft | `DJANGO_MICROSOFT_CLIENT_ID`, `DJANGO_MICROSOFT_CLIENT_SECRET` | `allauth.socialaccount.providers.microsoft` |
 
-Add providers via `DJANGO_AUTH_PROVIDERS=google,github,gitlab`.
+Enable providers with
+`DJANGO_AUTH_PROVIDERS=google,github,gitlab,microsoft`. The first release
+focuses on Google; the other providers are configuration-ready but are not
+covered by the React example.
 
 ## Frontend Integration
 
@@ -233,6 +296,12 @@ exists. For an authenticated session, `GET /api/me` returns:
 The frontend uses the `data.user` object to display the user's ID, username,
 and email after the OAuth callback completes.
 
+Google includes the email in its identity response when the `email` scope is
+requested. The authentication adapter copies that value into Django's user
+record when the local email is empty. The `/api/me` endpoint also falls back
+to the linked social account for existing users that were created before this
+synchronization was enabled.
+
 ## Testing
 
 ```bash
@@ -252,6 +321,12 @@ Before deploying:
 - [ ] `DJANGO_FRONTEND_URL` = production frontend URL
 - [ ] `DJANGO_CORS_ALLOWED_ORIGINS` = production frontend URL
 - [ ] `DJANGO_CSRF_TRUSTED_ORIGINS` = production frontend URL
+
+For unrelated frontend and backend domains, use the feature branch's
+authorization-code exchange. Django redirects with a short-lived one-time code
+in the URL fragment; the frontend posts it to `/api/auth/exchange`, then sends
+the returned access token in the `Authorization: Bearer` header. The reusable
+access token is never placed in the URL.
 - [ ] `DJANGO_SECURE_SSL_REDIRECT=True`
 - [ ] `DJANGO_SESSION_COOKIE_SECURE=True`
 - [ ] `DJANGO_CSRF_COOKIE_SECURE=True`
@@ -259,3 +334,13 @@ Before deploying:
 - [ ] Production database (not SQLite)
 - [ ] Google/GitHub OAuth redirect URIs updated to production URLs
 - [ ] Secrets in secret manager, not `.env`
+
+## Approach A status
+
+Approach A is complete as a universal copy-paste module. Copy the folder,
+import its exported settings, include its URL patterns, run migrations, and
+use the two management commands. The module derives its package path instead
+of requiring the consuming project to be named `config`.
+
+Approach B is separate: it will move this implementation into an installable
+`django-auth-kit` package in a new repository.
