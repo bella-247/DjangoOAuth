@@ -7,7 +7,8 @@ project with a React/Vite frontend, Django on port 8000, the frontend on port
 
 This is the **Approach A** version: copy the module into an existing Django
 project and add the small amount of settings and URL wiring below. A separate
-installable `django-auth-kit` package is planned for Approach B.
+installable `django-auth-headless` package is maintained in a separate
+repository.
 
 ## Quick Start
 
@@ -343,4 +344,4 @@ use the two management commands. The module derives its package path instead
 of requiring the consuming project to be named `config`.
 
 Approach B is separate: it will move this implementation into an installable
-`django-auth-kit` package in a new repository.
+`django-auth-headless` package in a separate repository.

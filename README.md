@@ -127,15 +127,8 @@ session verification work end to end.
   unrelated frontend and backend hosts.
   It is not part of the released package yet.
 
-## Further reading
+## Documentation
 
-- [`docs/04-configure-allauth.md`](docs/04-configure-allauth.md)
-- [`docs/05-configure-google-oauth.md`](docs/05-configure-google-oauth.md)
-- [`docs/06-verify-headless-api.md`](docs/06-verify-headless-api.md)
-- [`docs/07-build-react-frontend.md`](docs/07-build-react-frontend.md)
-- [`docs/08-audit-oauth-frontend.md`](docs/08-audit-oauth-frontend.md)
-- [`docs/10-audit-backend.md`](docs/10-audit-backend.md)
-- [`docs/11-test-headless-authentication.md`](docs/11-test-headless-authentication.md)
-- [`docs/12-test-session-logout-and-csrf.md`](docs/12-test-session-logout-and-csrf.md)
-- [`docs/13-production-readiness-audit.md`](docs/13-production-readiness-audit.md)
-- [`docs/14-modularize-backend-configuration.md`](docs/14-modularize-backend-configuration.md)
+- [`docs/README.md`](docs/README.md)
+- [`backend/config/authentication/README.md`](backend/config/authentication/README.md)
+- [`django-auth-headless` package documentation](https://github.com/bella-247/django-auth-headless/tree/main/docs)
